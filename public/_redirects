@@ -1,0 +1,3 @@
+# Proxy API requests to Render Backend
+# Replace https://YOUR_RENDER_URL_HERE with your actual Render URL (e.g., https://seha-backend.onrender.com)
+/inquiry/api  https://YOUR_RENDER_URL_HERE/inquiry/api  200

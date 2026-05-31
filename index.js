@@ -20,7 +20,7 @@ app.use(cors({
     origin: true, // Reflects the request origin, effectively allowing all
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
     exposedHeaders: ['Content-Disposition']
 }));
 app.use(bodyParser.json());

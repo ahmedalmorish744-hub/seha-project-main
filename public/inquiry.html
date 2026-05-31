@@ -50,9 +50,11 @@
                         return;
                     }
 
-                    // Show Loading
+                    // Show Loading - إظهار الدائرة المتحركة
                     submitBtn.disabled = true;
-                    submitBtn.textContent = "جاري التحقق...";
+                    submitBtn.style.display = "none";
+                    const spinnerOverlay = document.getElementById('spinner-overlay');
+                    spinnerOverlay.classList.add('active');
 
                     try {
                         const apiUrl = '/inquiry/api';
@@ -95,8 +97,11 @@
                         errorMessage.style.display = "block";
                         errorMessage.textContent = "حدث خطأ أثناء الاتصال بالنظام، يرجى المحاولة لاحقًا.";
                     } finally {
+                        // إخفاء الدائرة المتحركة
+                        spinnerOverlay.classList.remove('active');
                         submitBtn.disabled = false;
                         submitBtn.textContent = "استعلام";
+                        submitBtn.style.display = "inline-block";
                     }
                 });
             }
@@ -154,10 +159,57 @@
         body {
             direction: rtl;
         }
+
+        /* Spinning circle animation - الدائرة المتحركة */
+        .spinner-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.85);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+
+        .spinner-overlay.active {
+            display: flex;
+        }
+
+        .spinner-circle {
+            width: 60px;
+            height: 60px;
+            border: 5px solid #e0e0e0;
+            border-top: 5px solid #306db5;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-bottom: 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .spinner-text {
+            font-family: 'Cairo', sans-serif;
+            font-size: 16px;
+            color: #306db5;
+            font-weight: 600;
+        }
     </style>
 </head>
 
 <body dir="rtl">
+    <!-- Spinner Overlay - الدائرة المتحركة -->
+    <div id="spinner-overlay" class="spinner-overlay">
+        <div class="spinner-circle"></div>
+        <div class="spinner-text">جاري التحقق من البيانات...</div>
+    </div>
+
     <div style="z-index: 99; opacity: 1; transform: none">
         <nav class="header navbar-expand-lg navbar-light px-4">
             <div class="nav-container">

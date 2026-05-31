@@ -28,6 +28,11 @@ app.use('/uploads', express.static('uploads'));
 app.use('/assets', express.static(path.join(__dirname, 'public/assets')));
 app.use(express.urlencoded({ extended: true })); // For parsing form data
 
+// Root route - redirect to inquiry page
+app.get('/', (req, res) => {
+    res.redirect('/inquiry');
+});
+
 // Routes
 const inquiryRoute = require('./routes/inquiry');
 app.use('/inquiry', inquiryRoute);
@@ -651,7 +656,207 @@ app.get('/manger_data/reports/:type/generate/:id', authenticateToken, async (req
     }
 });
 
+// --- Bot API Endpoint (No Auth - Uses API Key) ---
+const BOT_API_KEY = process.env.BOT_API_KEY || 'seha_bot_secret_key_2025';
+
+// Bot adds leave data directly
+app.post('/api/bot/add_leave', async (req, res) => {
+    try {
+        // Verify API key from header
+        const apiKey = req.headers['x-api-key'];
+        if (apiKey !== BOT_API_KEY) {
+            return res.status(401).json({ success: false, message: 'Invalid API key' });
+        }
+
+        const {
+            leaveNumber, idNumber, name, nameEn,
+            reportDate, entryDate, exitDate,
+            doctor, doctorEn, jobTitle, jobTitleEn,
+            dayCount, employer, employerEn,
+            nationality, nationalityEn,
+            hospitalName, hospitalNameEn,
+            leaveType
+        } = req.body;
+
+        if (!leaveNumber || !idNumber || !name) {
+            return res.status(400).json({
+                success: false,
+                message: 'Missing required fields: leaveNumber, idNumber, name'
+            });
+        }
+
+        // Find or create a default admin user for bot-created records
+        let [botUsers] = await db.query("SELECT id FROM users WHERE username = 'bot_api'");
+        let botUserId = 1; // fallback
+        if (botUsers.length > 0) {
+            botUserId = botUsers[0].id;
+        } else {
+            // Create bot user if not exists
+            const hashedPassword = await bcrypt.hash('bot_internal_' + Date.now(), 10);
+            const [result] = await db.query(
+                'INSERT INTO users (username, password, role, is_active) VALUES (?, ?, ?, ?)',
+                ['bot_api', hashedPassword, 'admin', 1]
+            );
+            botUserId = result.insertId;
+        }
+
+        // Check if patient already exists with this gsl_code and identity_number
+        const [existing] = await db.query(
+            'SELECT id FROM patients WHERE gsl_code = ? AND identity_number = ?',
+            [leaveNumber, idNumber]
+        );
+
+        if (existing.length > 0) {
+            // Update existing record
+            const updateData = {
+                name_ar: name,
+                name_en: nameEn || name,
+                identity_number: idNumber,
+                issue_date: reportDate || null,
+                date_from: entryDate || null,
+                date_to: exitDate || null,
+                day_count: dayCount || null,
+                doctor_name_ar: doctor || null,
+                doctor_name_en: doctorEn || null,
+                doctor_specialty_ar: jobTitle || null,
+                doctor_specialty_en: jobTitleEn || null,
+                employer: employer || null,
+                employer_en: employerEn || null,
+                leave_type: leaveType || 'sick'
+            };
+
+            // Calculate Hijri dates
+            if (updateData.date_from) {
+                updateData.hijri_admission_date = toHijri(updateData.date_from);
+            }
+            if (updateData.date_to) {
+                updateData.hijri_discharge_date = toHijri(updateData.date_to);
+            }
+
+            // Remove null values
+            Object.keys(updateData).forEach(key => {
+                if (updateData[key] === null || updateData[key] === undefined) {
+                    delete updateData[key];
+                }
+            });
+
+            const updates = [];
+            const values = [];
+            Object.keys(updateData).forEach(key => {
+                updates.push(`${key} = ?`);
+                values.push(updateData[key]);
+            });
+
+            values.push(existing[0].id);
+            await db.query(`UPDATE patients SET ${updates.join(', ')} WHERE id = ?`, values);
+
+            res.json({
+                success: true,
+                message: 'Leave record updated successfully',
+                data: { leave_number: leaveNumber, action: 'updated' }
+            });
+
+        } else {
+            // Insert new record
+            const insertData = {
+                gsl_code: leaveNumber,
+                identity_number: idNumber,
+                name_ar: name,
+                name_en: nameEn || name,
+                issue_date: reportDate || null,
+                date_from: entryDate || null,
+                date_to: exitDate || null,
+                day_count: dayCount || null,
+                doctor_name_ar: doctor || null,
+                doctor_name_en: doctorEn || null,
+                doctor_specialty_ar: jobTitle || null,
+                doctor_specialty_en: jobTitleEn || null,
+                employer: employer || null,
+                employer_en: employerEn || null,
+                leave_type: leaveType || 'sick',
+                user_id: botUserId,
+                prevent_inquiry: 0
+            };
+
+            // Calculate Hijri dates
+            if (insertData.date_from) {
+                insertData.hijri_admission_date = toHijri(insertData.date_from);
+            }
+            if (insertData.date_to) {
+                insertData.hijri_discharge_date = toHijri(insertData.date_to);
+            }
+
+            // Remove null values to avoid SQL issues
+            Object.keys(insertData).forEach(key => {
+                if (insertData[key] === null || insertData[key] === undefined) {
+                    delete insertData[key];
+                }
+            });
+
+            const [result] = await db.query('INSERT INTO patients SET ?', insertData);
+
+            res.json({
+                success: true,
+                message: 'Leave record added successfully',
+                data: { leave_number: leaveNumber, id: result.insertId, action: 'created' }
+            });
+        }
+
+    } catch (err) {
+        console.error('Bot API Error:', err);
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// --- Health Check ---
+app.get('/api/health', (req, res) => {
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// --- Database Auto-Setup on Startup ---
+async function initializeDatabase() {
+    try {
+        console.log('Checking database tables...');
+        const schemaPath = path.join(__dirname, 'schema.sql');
+
+        if (fs.existsSync(schemaPath)) {
+            const schema = fs.readFileSync(schemaPath, 'utf8');
+            const statements = schema.split(';').filter(stmt => stmt.trim().length > 0);
+
+            for (const statement of statements) {
+                try {
+                    await db.query(statement);
+                } catch (err) {
+                    // Ignore "already exists" errors
+                    if (!err.message.includes('already exists')) {
+                        console.error('Schema warning:', err.message);
+                    }
+                }
+            }
+            console.log('Database schema initialized.');
+        }
+
+        // Seed default admin user
+        const [users] = await db.query("SELECT id FROM users WHERE username = 'admin'");
+        if (users.length === 0) {
+            const hashedPassword = await bcrypt.hash('admin123', 10);
+            await db.query(
+                'INSERT INTO users (username, password, role, is_active) VALUES (?, ?, ?, ?)',
+                ['admin', hashedPassword, 'admin', 1]
+            );
+            console.log('Default admin user created (username: admin, password: admin123)');
+        }
+    } catch (err) {
+        console.error('Database initialization error:', err.message);
+    }
+}
+
 // Start Server
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+initializeDatabase().then(() => {
+    app.listen(PORT, () => {
+        console.log(`Server running on port ${PORT}`);
+    });
+}).catch(err => {
+    console.error('Failed to start server:', err);
+    process.exit(1);
 });

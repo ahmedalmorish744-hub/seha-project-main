@@ -1,7 +1,3 @@
--- Create database
-CREATE DATABASE IF NOT EXISTS seha_db;
-USE seha_db;
-
 -- Users table
 CREATE TABLE IF NOT EXISTS users (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -90,6 +86,3 @@ CREATE INDEX IF NOT EXISTS idx_patients_identity ON patients(identity_number);
 CREATE INDEX IF NOT EXISTS idx_patients_user_id ON patients(user_id);
 CREATE INDEX IF NOT EXISTS idx_hospitals_user_id ON hospitals(user_id);
 CREATE INDEX IF NOT EXISTS idx_doctors_user_id ON doctors(user_id);
-
--- Insert default admin user (password: admin123)
-INSERT IGNORE INTO users (username, password, role, is_active) VALUES ('admin', '$2a$10$YourHashedPasswordHere', 'admin', 1);

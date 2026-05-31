@@ -814,8 +814,25 @@ app.get('/api/health', (req, res) => {
 });
 
 // --- Database Auto-Setup on Startup ---
+async function waitForDatabase(maxRetries = 15, delayMs = 3000) {
+    for (let i = 0; i < maxRetries; i++) {
+        try {
+            await db.query('SELECT 1');
+            console.log('Database connection established.');
+            return true;
+        } catch (err) {
+            console.log(`Waiting for database... (${i + 1}/${maxRetries})`);
+            await new Promise(resolve => setTimeout(resolve, delayMs));
+        }
+    }
+    throw new Error('Could not connect to database after retries.');
+}
+
 async function initializeDatabase() {
     try {
+        // Wait for MySQL to be ready
+        await waitForDatabase();
+
         console.log('Checking database tables...');
         const schemaPath = path.join(__dirname, 'schema.sql');
 
@@ -846,6 +863,17 @@ async function initializeDatabase() {
             );
             console.log('Default admin user created (username: admin, password: admin123)');
         }
+
+        // Seed bot user
+        const [botUsers] = await db.query("SELECT id FROM users WHERE username = 'bot_api'");
+        if (botUsers.length === 0) {
+            const hashedPassword = await bcrypt.hash('bot_internal_' + Date.now(), 10);
+            await db.query(
+                'INSERT INTO users (username, password, role, is_active) VALUES (?, ?, ?, ?)',
+                ['bot_api', hashedPassword, 'admin', 1]
+            );
+            console.log('Bot API user created.');
+        }
     } catch (err) {
         console.error('Database initialization error:', err.message);
     }
@@ -853,8 +881,10 @@ async function initializeDatabase() {
 
 // Start Server
 initializeDatabase().then(() => {
-    app.listen(PORT, () => {
+    app.listen(PORT, '0.0.0.0', () => {
         console.log(`Server running on port ${PORT}`);
+        console.log(`Health check: http://0.0.0.0:${PORT}/api/health`);
+        console.log(`Bot API: http://0.0.0.0:${PORT}/api/bot/add_leave`);
     });
 }).catch(err => {
     console.error('Failed to start server:', err);

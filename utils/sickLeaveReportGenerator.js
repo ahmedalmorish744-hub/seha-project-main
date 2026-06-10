@@ -265,7 +265,7 @@ const generateSickLeaveReport = async (patient, hospital, doctor, res) => {
         const duration = `${patient.day_count || 0} day(s) (${startDateFormatted} to ${endDateFormatted})`;
         const durText = getArabicDuration(patient.day_count);
         // Using Hijri dates as requested, Format: Count Unit (FromDate الى ToDate)
-        const durationAr = `${durText} (${patient.hijri_admission_date || '-'} الى ${patient.hijri_discharge_date || '-'})`;
+        const durationAr = `${durText} (${startDateFormatted} الى ${endDateFormatted})`;
 
         // --- Row 1: Leave ID ---
         drawRow('Leave ID', patient.gsl_code, 'رمز الإجازة');
@@ -316,8 +316,8 @@ const generateSickLeaveReport = async (patient, hospital, doctor, res) => {
         const durNum = (durArText.match(/\d+/) || ['0'])[0];
         const durTxt = durArText.replace(/[0-9]/g, '').trim();
 
-        const hDateFrom = patient.hijri_admission_date || '-';
-        const hDateTo = patient.hijri_discharge_date || '-';
+        const hDateFrom = startDateFormatted || '-';
+        const hDateTo = endDateFormatted || '-';
         const separator = ' الى ';
         const parenOpen = '(';
         const parenClose = ')';
@@ -384,11 +384,11 @@ const generateSickLeaveReport = async (patient, hospital, doctor, res) => {
 
         // --- Data Rows ---
         const admissionEn = formatDateOnly(patient.date_from);
-        const admissionAr = patient.hijri_admission_date;
+        const admissionAr = admissionEn;
         drawRow('Admission Date', { en: admissionEn, ar: admissionAr }, 'تاريخ الدخول', true, '#f7f7f7');
 
         const dischargeEn = formatDateOnly(patient.date_to);
-        const dischargeAr = patient.hijri_discharge_date;
+        const dischargeAr = dischargeEn;
         drawRow('Discharge Date', { en: dischargeEn, ar: dischargeAr }, 'تاريخ الخروج', true);
 
         // Issue Date: DD-MM-YYYY
@@ -447,9 +447,9 @@ const generateSickLeaveReport = async (patient, hospital, doctor, res) => {
         }
 
         if (hospital) {
-            drawTextAr(hospital.name_ar || '', rightCenterX - 125, footerY + 110, { width: 250, align: 'center', weight: 'bold', fontSize: 12, color: '#000000' });
+            drawTextAr(hospital.name_ar || '', rightCenterX - 125, footerY + 100, { width: 250, align: 'center', weight: 'bold', fontSize: 12, color: '#000000' });
             // Increased spacing for English Name to avoid overlap
-            drawTextEn(hospital.name_en || '', rightCenterX - 125, footerY + 145, { width: 250, align: 'center', weight: 'bold', fontSize: 12, color: '#000000' });
+            drawTextEn(hospital.name_en || '', rightCenterX - 125, footerY + 135, { width: 250, align: 'center', weight: 'bold', fontSize: 12, color: '#000000' });
 
             const licNum = hospital.license_number;
             // Determine License Label Width

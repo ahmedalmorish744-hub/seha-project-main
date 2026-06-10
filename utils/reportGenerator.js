@@ -235,11 +235,11 @@ const generateCompanionReport = async (patient, hospital, doctor, res) => {
 
         // --- Data Rows ---
         const admissionEn = formatDateOnly(patient.date_from);
-        const admissionAr = patient.hijri_admission_date;
+        const admissionAr = admissionEn;
         drawRow('Admission Date', { en: admissionEn, ar: admissionAr }, 'تاريخ الدخول', true);
 
         const dischargeEn = formatDateOnly(patient.date_to);
-        const dischargeAr = patient.hijri_discharge_date;
+        const dischargeAr = dischargeEn;
         drawRow('Discharge Date', { en: dischargeEn, ar: dischargeAr }, 'تاريخ الخروج', true);
 
         // Issue Date: DD-MM-YYYY
@@ -304,8 +304,8 @@ const generateCompanionReport = async (patient, hospital, doctor, res) => {
         }
 
         if (hospital) {
-            drawTextAr(hospital.name_ar || '', rightCenterX - 125, footerY + 110, { width: 250, align: 'center', weight: 'bold', fontSize: 12, color: '#000000' });
-            drawTextEn(hospital.name_en || '', rightCenterX - 125, footerY + 130, { width: 250, align: 'center', weight: 'bold', fontSize: 12, color: '#000000' });
+            drawTextAr(hospital.name_ar || '', rightCenterX - 125, footerY + 100, { width: 250, align: 'center', weight: 'bold', fontSize: 12, color: '#000000' });
+            drawTextEn(hospital.name_en || '', rightCenterX - 125, footerY + 120, { width: 250, align: 'center', weight: 'bold', fontSize: 12, color: '#000000' });
             const licNum = hospital.license_number || '1410101201200443';
             drawTextAr(`رقم الترخيص : ${licNum}`, rightCenterX - 125, footerY + 150, { width: 250, align: 'center', weight: 'bold', fontSize: 12, color: '#000000' });
         }
